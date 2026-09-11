@@ -85,79 +85,12 @@ The hammer icon in Claude will confirm the tools
 
 ### 2. Open WebUI Integration
 
-Go to Workspace → Tools → Create → Create
-Title: Movie Agent API
-Id: movie_agent_api
-Description: """Description"""
+User(Left bottom) -> Settings -> (Tools) Integrations -> External Tool Servers -> Click Add+
+Name: Movie Agent
+Description: Movie Agent
+url: http://host.docker.internal:8000
 
-content:
-```
-import requests
-from typing import Optional, List, Dict
-
-
-class Tools:
-    def __init__(self):
-        # Open WebUI backend calls this URL inside Docker
-        self.base_url = "http://host.docker.internal:8000"
-
-    def search_trending_movies(
-        self,
-        genre: Optional[str] = None,
-        min_rating: float = 6.0,
-        platform: Optional[str] = None,
-        limit: int = 20,
-    ) -> List[Dict]:
-        """
-        Search current trending movies from local database API.
-
-        :param genre: Filter by genre (e.g. 'action', 'comedy', 'horror', 'drama', 'scifi', 'thriller')
-        :param min_rating: Minimum IMDb score (default 6.0)
-        :param platform: Streaming platform filter (e.g. 'Netflix', 'Amazon Prime Video', 'Disney Plus', 'Apple TV Plus')
-        :param limit: Maximum records to return
-        """
-        try:
-            params = {"min_rating": min_rating, "limit": limit}
-            if genre:
-                params["genre"] = genre
-            if platform:
-                params["platform"] = platform
-
-            res = requests.get(
-                f"{self.base_url}/search_trending_movies", params=params, timeout=10
-            )
-            res.raise_for_status()
-            return res.json()
-        except Exception as e:
-            return [{"error": f"Failed to query API: {str(e)}"}]
-
-    def list_available_platforms(self) -> List[str]:
-        """
-        Returns a list of all distinct streaming platforms present in the UK database.
-        """
-        try:
-            res = requests.get(f"{self.base_url}/list_available_platforms", timeout=10)
-            res.raise_for_status()
-            return res.json()
-        except Exception as e:
-            return [f"Error: {str(e)}"]
-
-    def get_subscription_pricing(self, region: str = "GB") -> Dict[str, str]:
-        """
-        Returns monthly subscription pricing in GBP (£) for major UK platforms.
-        """
-        try:
-            res = requests.get(
-                f"{self.base_url}/get_subscription_pricing",
-                params={"region": region},
-                timeout=10,
-            )
-            res.raise_for_status()
-            return res.json()
-        except Exception as e:
-            return {"error": f"Error: {str(e)}"}
-
-```
+Select Model -> Tools -> Make the tool default
 
 
 ## 🧪 Testing & Verification

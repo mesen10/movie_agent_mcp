@@ -1,6 +1,7 @@
 import os
 import json
 import sqlite3
+from contextlib import asynccontextmanager
 from typing import List, Dict, Optional
 from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,11 +9,26 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.sse import SseServerTransport
 import uvicorn
 
+
+def export_openapi_json(app: FastAPI):
+    openapi_data = app.openapi()
+    file_path = os.path.join(os.getcwd(), "openapi.json")
+    with open(file_path, "w") as f:
+        json.dump(openapi_data, f, indent=2)
+    print(f"Generated openapi.json at: {file_path}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    export_openapi_json(app)
+    yield
+
 # 1. Initialize FastAPI Application
 app = FastAPI(
     title="Movie Agent API",
     description="Unified REST and MCP server for local UK trending movie database",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 app.add_middleware(
@@ -137,15 +153,6 @@ async def handle_sse(request: Request):
 @app.post("/messages/")
 async def handle_messages(request: Request):
     await sse.handle_post_message(request.scope, request.receive, request._send)
-
-# 5. Export openapi.json File on Startup
-@app.on_event("startup")
-def export_openapi_json():
-    openapi_data = app.openapi()
-    file_path = os.path.join(os.getcwd(), "openapi.json")
-    with open(file_path, "w") as f:
-        json.dump(openapi_data, f, indent=2)
-    print(f"Generated openapi.json at: {file_path}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
