@@ -1,6 +1,8 @@
+import asyncio
 import os
 import json
 import sqlite3
+import sys
 from contextlib import asynccontextmanager
 from typing import List, Dict, Optional
 from fastapi import FastAPI, Query, Request
@@ -12,7 +14,7 @@ import uvicorn
 
 def export_openapi_json(app: FastAPI):
     openapi_data = app.openapi()
-    file_path = os.path.join(os.getcwd(), "openapi.json")
+    file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "openapi.json")
     with open(file_path, "w") as f:
         json.dump(openapi_data, f, indent=2)
     print(f"Generated openapi.json at: {file_path}")
@@ -39,7 +41,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DB_PATH = os.path.abspath("movies.db")
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "movies.db")
 
 # 2. Shared Database Query Logic
 def db_search_trending_movies(genre: Optional[str] = None, min_rating: float = 6.0, platform: Optional[str] = None, limit: int = 20) -> List[Dict]:
@@ -155,4 +157,10 @@ async def handle_messages(request: Request):
     await sse.handle_post_message(request.scope, request.receive, request._send)
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    if "--stdio" in sys.argv:
+        # One subprocess per Claude Desktop session, talking MCP over stdio.
+        # No port bound, so concurrent sessions (main chat, Cowork, Code) don't
+        # collide on the single TCP port 8000 used by the REST/SSE server below.
+        asyncio.run(mcp.run_stdio_async())
+    else:
+        uvicorn.run(app, host="0.0.0.0", port=8000)

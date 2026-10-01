@@ -17,6 +17,7 @@
 * **Docker Desktop** (if using Open WebUI)
 * **Claude Desktop App** (if using Claude Sonnet 5)
 * **TMDB** API Key (for fetching trending movie data)
+* **Open WebUI admin API key** (only for automatic Open WebUI registration via `setup_clients.py`)
 * **Supported LLMs**:
   * **Ollama local models**: `gemma4:e2b` (verified)
   * **Claude Desktop**: **Claude Sonnet 5** (verified)
@@ -57,35 +58,55 @@ Upon startup, the server will:
 
 
 ## Client Integrations
-### 1. Claude Desktop App Setup
-To use Claude Sonnet 5 with your movie database tools:
+
+### Automatic setup (recommended)
+
+`setup_clients.py` registers the server with Claude Desktop and/or Open WebUI in one step:
+
+```bash
+# Add to both Claude Desktop and Open WebUI
+python setup_clients.py
+
+# Other actions
+python setup_clients.py status            # show registration status for both
+python setup_clients.py remove            # remove from both
+python setup_clients.py add --skip-openwebui   # Claude Desktop only
+python setup_clients.py add --skip-claude      # Open WebUI only
+```
+
+Open WebUI registration needs an admin API key (Settings -> Account -> API Keys). Put it in `local.env` (gitignored) as `OPENWEBUI_API_KEY=...`, pass `--openwebui-token`, or let the script prompt for it.
+
+Restart Claude Desktop after running the script; the hammer icon will confirm the tools (`search_trending_movies`, `list_available_platforms`, `get_subscription_pricing`) are loaded.
+
+### Manual setup
+
+#### Claude Desktop
 
 Open or create your Claude Desktop config file:
 ```
 code ~/Library/Application\ Support/Claude/claude_desktop_config.json
 ```
 
-### 2. Add the MCP server configuration:
+Add the MCP server configuration — note the `--stdio` flag, which runs the server over stdio instead of binding port 8000:
 ```JSON
 {
   "mcpServers": {
     "movie-agent": {
       "command": "/Users/matt/Projects/workspace-py/movie_agent_mcp/.venv/bin/python",
       "args": [
-        "/Users/matt/Projects/workspace-py/movie_agent_mcp/unified_server.py"
+        "/Users/matt/Projects/workspace-py/movie_agent_mcp/unified_server.py",
+        "--stdio"
       ]
     }
   }
 }
 ```
 
-### 3. Restart the Claude Desktop App. 
-The hammer icon in Claude will confirm the tools 
-(search_trending_movies, list_available_platforms, get_subscription_pricing) are loaded.
+Restart the Claude Desktop App. The hammer icon in Claude will confirm the tools are loaded.
 
-### 2. Open WebUI Integration
+#### Open WebUI
 
-User(Left bottom) -> Settings -> (Tools) Integrations -> External Tool Servers -> Click Add+
+User (bottom left) -> Settings -> (Tools) Integrations -> External Tool Servers -> Click Add+
 Name: Movie Agent
 Description: Movie Agent
 url: http://host.docker.internal:8000
