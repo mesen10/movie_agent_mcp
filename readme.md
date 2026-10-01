@@ -56,6 +56,14 @@ Upon startup, the server will:
 * Automatically write openapi.json to the project root.
 * Expose the MCP SSE endpoint at http://localhost:8000/sse.
 
+### 4. Register with Claude Desktop & Open WebUI
+
+```bash
+python setup_clients.py
+```
+
+Adds this server to both Claude Desktop and Open WebUI in one run. See [Client Integrations](#client-integrations) below for details and manual setup.
+
 
 ## Client Integrations
 
