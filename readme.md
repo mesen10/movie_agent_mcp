@@ -123,6 +123,14 @@ Select Model -> Tools -> Make the tool default
 
 
 ## 🧪 Testing & Verification
+
+Automated tests (no network access needed; TMDB and the filesystem config are mocked):
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest
+```
+
 Check the endpoints directly from your terminal:
 ```
 # Verify REST OpenAPI schema

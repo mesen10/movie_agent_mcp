@@ -6,7 +6,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
-DB_PATH = os.path.abspath("movies.db")
+# Anchored to this file (not the cwd) so it matches where unified_server.py reads from.
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "movies.db")
+REQUEST_TIMEOUT = 30  # seconds
 REGION = os.getenv("DEFAULT_REGION", "GB")
 
 GENRE_MAP = {
@@ -73,15 +75,8 @@ def sync_movies():
     if not TMDB_API_KEY:
         raise ValueError("TMDB_API_KEY environment variable is missing.")
 
-    conn = sqlite3.connect(DB_PATH)
-    init_db(conn)
-    cursor = conn.cursor()
-
-    # Clear previous snapshot completely
-    cursor.execute("DELETE FROM movie_providers")
-    cursor.execute("DELETE FROM movies")
-
-    # Fetch 500 trending movies (25 pages * 20 movies/page)
+    # Fetch everything first. The old snapshot is only replaced once we have
+    # fresh data, so a TMDB outage cannot leave the cache empty.
     raw_movies = []
     seen_ids = set()
     target_count = 500
@@ -91,7 +86,7 @@ def sync_movies():
     for page in range(1, 26):  # 25 pages = 500 movies
         url = "https://api.themoviedb.org/3/trending/movie/week"
         params = {"api_key": TMDB_API_KEY, "page": page}
-        res = requests.get(url, params=params)
+        res = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
 
         if res.status_code == 200:
             results = res.json().get("results", [])
@@ -110,6 +105,17 @@ def sync_movies():
 
     print(f"Total unique movies retrieved: {len(raw_movies)}")
 
+    if not raw_movies:
+        raise RuntimeError("No movies retrieved from TMDB; keeping the existing snapshot.")
+
+    conn = sqlite3.connect(DB_PATH)
+    init_db(conn)
+    cursor = conn.cursor()
+
+    # Replace the snapshot in one transaction (committed at the end; rolled back on error).
+    cursor.execute("DELETE FROM movie_providers")
+    cursor.execute("DELETE FROM movies")
+
     # Insert movies & fetch Watch Providers dynamically for ALL flatrate services
     for index, movie in enumerate(raw_movies, 1):
         m_id = movie.get("id")
@@ -127,7 +133,7 @@ def sync_movies():
 
         # Fetch provider info from TMDB Watch Providers API
         prov_url = f"https://api.themoviedb.org/3/movie/{m_id}/watch/providers"
-        prov_res = requests.get(prov_url, params={"api_key": TMDB_API_KEY})
+        prov_res = requests.get(prov_url, params={"api_key": TMDB_API_KEY}, timeout=REQUEST_TIMEOUT)
 
         if prov_res.status_code == 200:
             reg_data = prov_res.json().get("results", {}).get(REGION, {})
