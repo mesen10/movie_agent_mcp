@@ -36,7 +36,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    # No auth/cookies on this API, and browsers reject "*" combined with credentials.
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -52,11 +53,14 @@ def db_search_trending_movies(genre: Optional[str] = None, min_rating: float = 6
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
+    # The platform filter lives in an EXISTS subquery so it selects movies only;
+    # the GROUP_CONCAT below still lists every platform each movie is on.
     query = """
-        SELECT DISTINCT m.id, m.title, m.imdb_score, m.release_date, m.genres,
-               GROUP_CONCAT(p.platform, ', ') AS platforms
+        SELECT m.id, m.title, m.imdb_score, m.release_date, m.genres,
+               (SELECT GROUP_CONCAT(p.platform, ', ')
+                  FROM movie_providers p
+                 WHERE p.movie_id = m.id) AS platforms
         FROM movies m
-        LEFT JOIN movie_providers p ON m.id = p.movie_id
         WHERE m.imdb_score >= ?
     """
     params = [min_rating]
@@ -66,14 +70,18 @@ def db_search_trending_movies(genre: Optional[str] = None, min_rating: float = 6
         params.append(f"%{genre.lower()}%")
 
     if platform:
-        query += " AND LOWER(p.platform) LIKE ?"
+        query += """ AND EXISTS (SELECT 1 FROM movie_providers p
+                                  WHERE p.movie_id = m.id AND LOWER(p.platform) LIKE ?)"""
         params.append(f"%{platform.lower()}%")
 
-    query += " GROUP BY m.id ORDER BY m.imdb_score DESC LIMIT ?"
+    query += " ORDER BY m.imdb_score DESC LIMIT ?"
     params.append(limit)
 
-    cursor.execute(query, params)
-    rows = cursor.fetchall()
+    try:
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+    finally:
+        conn.close()
 
     results = []
     for row in rows:
@@ -86,7 +94,6 @@ def db_search_trending_movies(genre: Optional[str] = None, min_rating: float = 6
             "available_platforms": row["platforms"].split(", ") if row["platforms"] else ["Not available on tracked subscription platforms"]
         })
 
-    conn.close()
     return results
 
 def db_list_available_platforms() -> List[str]:

@@ -12,3 +12,8 @@
 
 /local.env
 /movies.db
+# Python / tooling
+.venv/
+__pycache__/
+.pytest_cache/
+sync.log
